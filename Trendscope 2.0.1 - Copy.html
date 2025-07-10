@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TrendScope</title>
+  <style>
+    :root{
+      --bg-color:#000;
+      --text-color:#fff;
+      --card-bg:rgba(0,0,0,.6);
+      --button-bg:#00ccff;
+      --accent:#ffd966;
+    }
+    body.light-mode{
+      --bg-color:#fafafa;
+      --text-color:#111;
+      --card-bg:rgba(255,255,255,.85);
+      --button-bg:#0077cc;
+      --accent:#3366ff;
+    }
+
+    /* Base styles */
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      min-height:100vh;
+      display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+      padding:20px;
+      font-family:Arial,Helvetica,sans-serif;
+      color:var(--text-color);
+      background:url('https://helios-i.mashable.com/imagery/articles/06MMvFH116fn4PVpOggABLc/hero-image.fill.size_1248x702.v1739553721.jpg') no-repeat center/cover fixed;
+      transition:.3s;
+    }
+
+    h1{margin:80px 0 20px;text-align:center;text-shadow:0 2px 6px rgba(0,0,0,.5)}
+    ul{list-style:none;padding:0;margin:35px auto 0;width:100%;max-width:760px}
+    li{background:var(--card-bg);margin:10px 0;padding:15px 18px;border-radius:12px;
+        box-shadow:0 4px 14px rgba(0,0,0,.45);line-height:1.45}
+    a.video-link{color:var(--accent);text-decoration:none;font-weight:bold}
+
+    /* Controls */
+    .controls{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+    .controls input[type=text]{padding:10px;font-size:17px;width:260px;border-radius:6px;border:none;outline:none}
+    .controls button,.controls select,.controls label{font-size:16px;padding:10px 14px;border-radius:6px;border:none;outline:none;}
+    button{background:var(--button-bg);color:#fff;cursor:pointer}
+    button:hover{filter:brightness(.9)}
+    select{background:var(--card-bg);color:var(--text-color)}
+    label{display:flex;align-items:center;gap:6px;color:var(--text-color)}
+
+    /* Header buttons */
+    .top-links{position:fixed;top:18px;right:18px;display:flex;gap:10px;flex-wrap:wrap}
+    .top-links a{padding:9px 16px;border-radius:6px;font-weight:bold;text-decoration:none;color:#fff;background:#ff0000}
+    .top-links a:nth-child(2){background:#00ccff}
+
+    /* Toggle */
+    .toggle{position:fixed;top:18px;left:18px;color:var(--text-color)}
+
+    /* Latest uploads */
+    #latest{margin-top:45px}
+    #latest h2{margin-bottom:10px;text-align:center}
+
+    /* Mobile */
+    @media(max-width:600px){
+      h1{margin-top:120px;font-size:26px}
+      .controls{flex-direction:column;align-items:stretch}
+      .top-links{position:static;margin-top:10px}
+      body{padding:15px}
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Dark / Light toggle -->
+  <div class="toggle">
+    <label><input type="checkbox" id="modeSwitch" onchange="document.body.classList.toggle('light-mode')"> Light Mode</label>
+  </div>
+
+  <!-- Quick links to channels -->
+  <div class="top-links">
+    <a href="https://www.youtube.com/channel/YOUR_CHANNEL_ID" target="_blank">My Channel</a>
+    <a href="https://www.youtube.com/@MrBeast" target="_blank">MrBeast</a>
+  </div>
+
+  <h1>🔍 TrendScope</h1>
+
+  <!-- Search controls -->
+  <div class="controls">
+    <input list="suggestions" id="topic" placeholder="Enter a topic…">
+    <datalist id="suggestions"></datalist>
+
+    <label><input type="checkbox" id="recent"> Last 7 days</label>
+
+    <select id="sort">
+      <option value="viewsPerDay">Sort by Views/Day</option>
+      <option value="likes">Sort by Likes</option>
+    </select>
+
+    <button onclick="searchYouTube()">Search</button>
+  </div>
+
+  <!-- Results -->
+  <ul id="results"></ul>
+
+  <!-- Latest uploads -->
+  <div id="latest">
+    <h2>📺 Latest from My Channel</h2>
+    <ul id="myVideos"></ul>
+  </div>
+
+<script>
+/* ---------- Configuration ---------- */
+const API_KEY   = "AIzaSyDKXLE4GvkiRx5FRf0YfuvElJ_hxNp_Vac";   // << replace
+const MY_CH_ID  = "UCaTxx8PUr3IojJYILc-hveQ";     // << replace
+
+/* ---------- Trending topic suggestions ---------- */
+const trendingTopics = [
+  "AI Experiments","Minecraft Challenges","24 Hours Survival",
+  "Speedrunning","$10 vs $10,000","React Tutorials","Unreal Engine 5",
+  "Space Discoveries","VR Gaming","Zero Budget Projects"
+];
+document.getElementById('suggestions').innerHTML =
+  trendingTopics.map(t=>`<option value="${t}">`).join('');
+
+/* ---------- Helper to build ISO date 7 days ago ---------- */
+function isoDate7DaysAgo(){
+  const d = new Date(Date.now() - 7*24*60*60*1000);
+  return d.toISOString();
+}
+
+/* ---------- Search main function ---------- */
+async function searchYouTube(){
+  const topic     = document.getElementById('topic').value.trim();
+  const onlyRecent= document.getElementById('recent').checked;
+  const sortBy    = document.getElementById('sort').value;
+  const resultsEl = document.getElementById('results');
+
+  if(!topic){alert("Type a topic first!");return}
+
+  resultsEl.textContent = "Loading…";
+
+  /* Build search request */
+  let searchURL = `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=10&type=video&order=viewCount&q=${encodeURIComponent(topic)}&key=${API_KEY}`;
+  if(onlyRecent){
+    searchURL += `&publishedAfter=${isoDate7DaysAgo()}`;
+  }
+
+  try{
+    const sRes = await fetch(searchURL).then(r=>r.json());
+    const ids = sRes.items.map(it=>it.id.videoId).join(",");
+    if(!ids){resultsEl.textContent="No videos found.";return}
+
+    const vURL = `https://www.googleapis.com/youtube/v3/videos?part=statistics,snippet&id=${ids}&key=${API_KEY}`;
+    const vRes = await fetch(vURL).then(r=>r.json());
+
+    /* Map and compute stats */
+    let vids = vRes.items.map(v=>{
+      const stats=v.statistics, sn=v.snippet;
+      const views= +stats.viewCount||0, likes= +stats.likeCount||0;
+      const days = Math.max(1, (Date.now()-new Date(sn.publishedAt))/864e5|0);
+      return {
+        id:v.id,title:sn.title,channel:sn.channelTitle,
+        views,likes, viewsPerDay:Math.round(views/days)
+      };
+    });
+
+    /* Sort */
+    vids.sort((a,b)=>b[sortBy]-a[sortBy]);
+
+    /* Render */
+    resultsEl.innerHTML = vids.map(v=>`
+      <li>
+        <b>${v.title}</b><br>
+        Channel: ${v.channel}<br>
+        Views: ${v.views.toLocaleString()} |
+        Likes: ${v.likes.toLocaleString()} |
+        Views/Day: ${v.viewsPerDay.toLocaleString()}<br>
+        <a class="video-link" href="https://youtu.be/${v.id}" target="_blank">▶ Watch</a>
+      </li>`).join('');
+
+  }catch(err){
+    console.error(err);
+    resultsEl.textContent = "❌ Error fetching videos.";
+  }
+}
+
+/* ---------- Fetch latest uploads from your channel ---------- */
+async function loadMyUploads(){
+  const listEl = document.getElementById('myVideos');
+  if(!API_KEY||!MY_CH_ID){listEl.innerHTML="<li>Set channel ID first.</li>";return}
+  const url=`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${MY_CH_ID}&maxResults=3&order=date&type=video&key=${API_KEY}`;
+  try{
+    const data = await fetch(url).then(r=>r.json());
+    listEl.innerHTML=data.items.map(v=>`
+      <li>
+        <b>${v.snippet.title}</b><br>
+        <a class="video-link" href="https://youtu.be/${v.id.videoId}" target="_blank">▶ Watch</a>
+      </li>`).join('');
+  }catch(e){
+    console.error(e);
+    listEl.innerHTML="<li>Couldn't load uploads.</li>";
+  }
+}
+/* Load on page start */
+loadMyUploads();
+</script>
+</body>
+</html>
